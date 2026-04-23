@@ -775,3 +775,56 @@ button {
     min-width: 0;
   }
 }
+
+@media (prefers-color-scheme: dark) {
+
+  body {
+    background: #0f172a;
+    color: #e5e7eb;
+  }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+  }
+
+  .mini-card {
+    background: #1e293b;
+  }
+
+  .system-stat {
+    background: #1e293b;
+  }
+
+  .kid-button {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  .kid-button.active {
+    background: #111827;
+    border-color: #e5e7eb;
+  }
+
+  .task-row,
+  .reward-row,
+  .activity-row,
+  .deduction-row {
+    background: #1e293b;
+    border-color: #334155;
+  }
+
+  small {
+    color: #9ca3af;
+  }
+
+  .nav-btn {
+    background: #1e293b;
+    color: #e5e7eb;
+  }
+
+  .active-nav {
+    background: #e5e7eb;
+    color: #111827;
+  }
+}
