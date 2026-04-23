@@ -1556,18 +1556,6 @@ function App() {
       points: 10,
     });
   };
-  const handleSignUp = async () => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Signup successful! You can now log in.");
-    }
-  };
 
   const handleSignIn = async () => {
     const { error } = await supabase.auth.signInWithPassword({
@@ -1664,9 +1652,6 @@ function App() {
             />
 
             <button onClick={handleSignIn}>Sign In</button>
-            <button type="button" onClick={handleSignUp}>
-              Sign Up
-            </button>
           </div>
         </div>
       </div>
