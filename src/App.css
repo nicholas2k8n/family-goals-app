@@ -2,6 +2,14 @@
   color-scheme: light;
 }
 
+html,
+body,
+input,
+select,
+textarea {
+  -webkit-text-fill-color: initial;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -11,8 +19,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
   background: #f4f6f8;
   color: #111827;
-  -webkit-text-fill-color: #111827;
-  /* fixes iOS weird text bug */
 }
 
 button,
@@ -23,6 +29,7 @@ select {
 
 button {
   cursor: pointer;
+  -webkit-text-fill-color: currentColor;
 }
 
 .app {
@@ -211,6 +218,7 @@ button {
 .reward-row button:not(.delete-btn) {
   background: #111827;
   color: white;
+  -webkit-text-fill-color: white;
   border: none;
 }
 
@@ -766,8 +774,4 @@ button {
     width: 100%;
     min-width: 0;
   }
-}
-
-* {
-  -webkit-text-fill-color: inherit;
 }
