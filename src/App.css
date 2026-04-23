@@ -938,54 +938,134 @@ label {
 }
 
 @media (max-width: 700px) {
+
+  /* App padding */
   .app {
-    padding: 14px;
+    padding: 12px;
   }
 
-  .button-grid {
-    grid-template-columns: 1fr;
+  /* Header */
+  .hero h1 {
+    font-size: 24px;
+    line-height: 1.2;
   }
 
-  .screen-tools-row {
-    align-items: stretch;
+  .hero p {
+    font-size: 14px;
   }
 
-  .screen-cost-inline {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .screen-cost-controls {
-    flex-wrap: wrap;
-  }
-
-  .screen-cost-controls input,
-  .screen-cost-controls button {
-    width: 100%;
-  }
-
-  .fulfillment-row {
-    align-items: flex-start;
-  }
-
-  .fulfillment-title-row {
-    flex-direction: column;
-    align-items: flex-start;
+  /* Nav buttons */
+  .top-nav {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
 
-  .fulfillment-btn {
+  .nav-btn {
     width: 100%;
-    min-width: 0;
+    text-align: center;
+    padding: 10px 0;
+    font-size: 14px;
   }
 
+  /* Pills row */
+  .pill-row {
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .pill {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  /* Stats cards tighter */
+  .stats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  /* Kids cards */
+  .kid-button {
+    padding: 12px;
+  }
+
+  /* Parent controls spacing */
+  .parent-tile {
+    padding: 14px;
+  }
+
+  .form-block {
+    gap: 8px;
+  }
+
+  .form-block input,
+  .form-block select {
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  /* Buttons */
+  .form-block button,
+  .button-grid button {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  /* 🔥 FIX REQUEST FORM (BIG ONE) */
   .request-actions {
     flex-direction: column;
-    align-items: stretch;
+    gap: 10px;
   }
 
   .request-edit-block {
-    min-width: 0;
     width: 100%;
+  }
+
+  .request-edit-block input,
+  .request-edit-block textarea {
+    width: 100%;
+  }
+
+  /* Force request inputs stacked */
+  .request-row input,
+  .request-row textarea {
+    width: 100%;
+    display: block;
+  }
+
+  /* Section spacing cleanup */
+  .content {
+    gap: 14px;
+  }
+
+  .card h2,
+  .card h3 {
+    margin-bottom: 8px;
+  }
+
+  /* Reduce vertical bloat */
+  .mini-card {
+    padding: 10px;
+  }
+
+  .system-stat {
+    padding: 10px;
+  }
+
+  /* Quick actions */
+  .button-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Reward button stays big */
+  .reward-request-btn {
+    min-height: 64px;
   }
 }
