@@ -67,6 +67,7 @@ function App() {
   const [requestApprovalEdits, setRequestApprovalEdits] = useState({});
   const [screenCostInput, setScreenCostInput] = useState("10");
   const [readingGoalInput, setReadingGoalInput] = useState("0");
+  const [readingPointsInput, setReadingPointsInput] = useState("2");
   const [now, setNow] = useState(new Date());
   const selectedProfile = useMemo(() => {
     if (isChild) {
@@ -489,6 +490,7 @@ function App() {
     if (!selectedTotals) return;
     setScreenCostInput(String(selectedTotals.screen_time_cost_per_10 ?? 0));
     setReadingGoalInput(String(selectedTotals.daily_reading_goal ?? 0));
+    setReadingPointsInput(String(selectedTotals.reading_points_per_10 ?? 2));
   }, [selectedTotals]);
 
   const selectedKid = useMemo(() => {
@@ -503,6 +505,7 @@ function App() {
       readingMinutes: selectedTotals.reading_minutes,
       readingToday: selectedTotals.reading_today,
       dailyReadingGoal: selectedTotals.daily_reading_goal,
+      readingPointsPer10: selectedTotals.reading_points_per_10 ?? 2,
       readingDebt: selectedTotals.reading_debt,
       readingBank: selectedTotals.reading_bank,
       learningMinutes: selectedTotals.learning_minutes,
@@ -1439,13 +1442,19 @@ function App() {
       reading_today: isReading
         ? (selectedTotals.reading_today || 0) + minutes
         : (selectedTotals.reading_today || 0),
-      points: (selectedTotals.points || 0) + Math.max(1, Math.round(minutes / 5)),
+      points:
+        (selectedTotals.points || 0) +
+        (isReading
+          ? Math.max(0, Math.round((minutes / 10) * (selectedTotals.reading_points_per_10 ?? 2)))
+          : Math.max(1, Math.round(minutes / 5))),
     };
 
     const updated = await updateSelectedTotalsRow(updates);
     if (!updated) return;
 
-    const pointsEarned = Math.max(1, Math.round(minutes / 5));
+    const pointsEarned = isReading
+      ? Math.max(0, Math.round((minutes / 10) * (selectedTotals.reading_points_per_10 ?? 2)))
+      : Math.max(1, Math.round(minutes / 5));
 
     await insertActivityLog(
       `+${pointsEarned} pts — ${kind === "reading" ? "Reading" : "Learning"}: ${minutes} minutes`
@@ -1465,6 +1474,21 @@ function App() {
     await insertActivityLog(`Updated daily reading goal to ${newGoal} min`);
 
     setReadingGoalInput(String(newGoal));
+  };
+
+  const updateReadingPointsValue = async () => {
+    if (!canSeeParentControls || !selectedTotals || !selectedProfile) return;
+
+    const newValue = Math.max(0, Number(readingPointsInput) || 0);
+
+    const updated = await updateSelectedTotalsRow({
+      reading_points_per_10: newValue,
+    });
+    if (!updated) return;
+
+    await insertActivityLog(`Updated reading points to ${newValue} pts per 10 min`);
+
+    setReadingPointsInput(String(newValue));
   };
 
   const applyScreenCost = async () => {
@@ -2241,6 +2265,24 @@ function App() {
 
                       <small className="screen-cost-current">
                         Current: {selectedKid.dailyReadingGoal} min
+                      </small>
+                    </div>
+                    <div className="screen-cost-inline">
+                      <label>Reading Points Value (per 10 minutes)</label>
+
+                      <div className="screen-cost-controls">
+                        <input
+                          type="number"
+                          value={readingPointsInput}
+                          onChange={(e) => setReadingPointsInput(e.target.value)}
+                        />
+                        <button type="button" onClick={updateReadingPointsValue}>
+                          Set Points
+                        </button>
+                      </div>
+
+                      <small className="screen-cost-current">
+                        Current: {selectedKid.readingPointsPer10} pts per 10 min
                       </small>
                     </div>
                   </div>
