@@ -7,6 +7,13 @@ function App() {
   const [session, setSession] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [isResetPasswordPage, setIsResetPasswordPage] = useState(
+    window.location.pathname === "/reset-password"
+  );
+  const [passwordRecoveryProfiles, setPasswordRecoveryProfiles] = useState([]);
+  const [selectedRecoveryProfileId, setSelectedRecoveryProfileId] = useState("");
   const [dbProfile, setDbProfile] = useState(null);
   const currentUser = dbProfile?.name || "Unknown User";
   const currentRole = dbProfile?.role
@@ -97,8 +104,12 @@ function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+
+      if (event === "PASSWORD_RECOVERY") {
+        setIsResetPasswordPage(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -129,6 +140,30 @@ function App() {
 
     loadProfile();
   }, [session]);
+
+  useEffect(() => {
+    const loadPasswordRecoveryProfiles = async () => {
+      if (!dbProfile || !isOwner) {
+        setPasswordRecoveryProfiles([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, role, email")
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.log("Password recovery profiles load error:", error.message);
+        setPasswordRecoveryProfiles([]);
+        return;
+      }
+
+      setPasswordRecoveryProfiles(data || []);
+    };
+
+    loadPasswordRecoveryProfiles();
+  }, [dbProfile, isOwner]);
 
   useEffect(() => {
     const loadHouseholds = async () => {
@@ -1557,6 +1592,82 @@ function App() {
     });
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      alert("Enter the email address first.");
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Password reset email sent.");
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPassword || resetPassword.length < 6) {
+      alert("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (resetPassword !== resetPasswordConfirm) {
+      alert("Passwords do not match.");
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: resetPassword,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Password updated. Please sign in again.");
+
+    setResetPassword("");
+    setResetPasswordConfirm("");
+    setIsResetPasswordPage(false);
+
+    window.history.replaceState({}, "", "/");
+
+    await supabase.auth.signOut();
+  };
+
+  const handleSendRecoveryEmail = async () => {
+    if (!isOwner) {
+      alert("Only the owner can send password recovery emails.");
+      return;
+    }
+
+    const selectedUser = passwordRecoveryProfiles.find(
+      (profile) => profile.id === selectedRecoveryProfileId
+    );
+
+    if (!selectedUser?.email) {
+      alert("Select a user with an email address.");
+      return;
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert(`Password recovery email sent to ${selectedUser.email}`);
+  };
+
   const handleSignIn = async () => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -1619,6 +1730,35 @@ function App() {
     });
   };
 
+  if (isResetPasswordPage) {
+    return (
+      <div className="app">
+        <div className="card" style={{ maxWidth: "420px", margin: "40px auto" }}>
+          <h2>Reset Password</h2>
+          <p>Enter your new password below.</p>
+
+          <div className="form-block">
+            <input
+              type="password"
+              placeholder="New password"
+              value={resetPassword}
+              onChange={(e) => setResetPassword(e.target.value)}
+            />
+
+            <input
+              type="password"
+              placeholder="Confirm new password"
+              value={resetPasswordConfirm}
+              onChange={(e) => setResetPasswordConfirm(e.target.value)}
+            />
+
+            <button onClick={handleResetPassword}>Update Password</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (session && currentPage !== "users" && (!selectedProfile || !selectedTotals)) {
     return (
       <div className="app">
@@ -1652,6 +1792,9 @@ function App() {
             />
 
             <button onClick={handleSignIn}>Sign In</button>
+            <button type="button" onClick={handleForgotPassword}>
+              Forgot Password
+            </button>
           </div>
         </div>
       </div>
@@ -2582,6 +2725,30 @@ function App() {
                 />
 
                 <button onClick={handleCreateUser}>Create User</button>
+              </div>
+            </aside>
+            <aside className="card parent-tile">
+              <h2>Password Recovery</h2>
+              <p className="admin-note">
+                Send a password reset email to an existing user.
+              </p>
+
+              <div className="form-block">
+                <select
+                  value={selectedRecoveryProfileId}
+                  onChange={(e) => setSelectedRecoveryProfileId(e.target.value)}
+                >
+                  <option value="">Select User</option>
+                  {passwordRecoveryProfiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name} ({profile.role}) - {profile.email || "No email"}
+                    </option>
+                  ))}
+                </select>
+
+                <button onClick={handleSendRecoveryEmail}>
+                  Send Password Recovery Email
+                </button>
               </div>
             </aside>
           </div>
