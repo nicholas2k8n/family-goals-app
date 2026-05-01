@@ -522,6 +522,9 @@ function App() {
         points: item.points,
         done: item.done,
         frequency: item.frequency,
+        is_active: item.is_active,
+        completed_at: item.completed_at,
+        delete_after_reset: item.delete_after_reset,
       })),
       hygiene: selectedHygiene.map((item) => ({
         id: item.id,
@@ -529,6 +532,9 @@ function App() {
         points: item.points,
         done: item.done,
         frequency: item.frequency,
+        is_active: item.is_active,
+        completed_at: item.completed_at,
+        delete_after_reset: item.delete_after_reset,
       })),
       tasks: selectedTasks.map((item) => ({
         id: item.id,
@@ -536,12 +542,16 @@ function App() {
         points: item.points,
         done: item.done,
         frequency: item.frequency,
+        is_active: item.is_active,
+        completed_at: item.completed_at,
+        delete_after_reset: item.delete_after_reset,
       })),
       rewards: selectedRewards.map((item) => ({
         id: item.id,
         title: item.title,
         cost: item.cost,
         claimed: item.claimed,
+        status: item.status,
       })),
       rewardRequests: selectedRewardRequests.map((item) => ({
         id: item.id,
@@ -680,131 +690,98 @@ function App() {
   const toggleItem = async (itemId, section) => {
     if (!selectedProfile?.id || !selectedTotals) return;
 
-    if (section === "chores") {
-      const target = selectedChores.find((item) => item.id === itemId);
-      if (!target) return;
+    const config = {
+      chores: {
+        items: selectedChores,
+        table: "chores",
+        doneCountField: "chores_done",
+        setItems: setSelectedChores,
+        label: "chore",
+      },
+      hygiene: {
+        items: selectedHygiene,
+        table: "hygiene",
+        doneCountField: "hygiene_done",
+        setItems: setSelectedHygiene,
+        label: "hygiene",
+      },
+      tasks: {
+        items: selectedTasks,
+        table: "tasks",
+        doneCountField: null,
+        setItems: setSelectedTasks,
+        label: "task",
+      },
+    };
 
-      const newDone = !target.done;
-      const pointDelta = newDone ? target.points : -target.points;
-      const choreDelta = newDone ? 1 : -1;
+    const selectedConfig = config[section];
 
-      const { error } = await supabase
-        .from("chores")
-        .update({ done: newDone })
-        .eq("id", itemId);
-
-      if (error) {
-        console.log("Toggle chore error:", error.message);
-        return;
-      }
-
-      const updatedTotals = await updateSelectedTotalsRow({
-        points: Math.max(0, (selectedTotals.points || 0) + pointDelta),
-        chores_done: Math.max(0, (selectedTotals.chores_done || 0) + choreDelta),
-      });
-
-      if (!updatedTotals) return;
-
-      const { data, error: refreshError } = await supabase
-        .from("chores")
-        .select("*")
-        .eq("profile_id", selectedProfile.id)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true });
-
-      if (!refreshError) {
-        setSelectedChores(data || []);
-      }
-
-      await insertActivityLog(
-        `${newDone ? `+${target.points} pts — Completed chore` : `-${target.points} pts — Unchecked chore`}: ${target.title}`
-      );
+    if (!selectedConfig) {
+      alert(`${section} is not migrated to the database yet.`);
       return;
     }
 
-    if (section === "hygiene") {
-      const target = selectedHygiene.find((item) => item.id === itemId);
-      if (!target) return;
+    const target = selectedConfig.items.find((item) => item.id === itemId);
+    if (!target) return;
 
-      const newDone = !target.done;
-      const pointDelta = newDone ? target.points : -target.points;
-      const hygieneDelta = newDone ? 1 : -1;
+    const newDone = !target.done;
+    const pointDelta = newDone ? target.points : -target.points;
 
-      const { error } = await supabase
-        .from("hygiene")
-        .update({ done: newDone })
-        .eq("id", itemId);
+    const itemUpdates = {
+      done: newDone,
+      completed_at: newDone ? new Date().toISOString() : null,
+    };
 
-      if (error) {
-        console.log("Toggle hygiene error:", error.message);
-        return;
+    if (newDone) {
+      itemUpdates.is_active = false;
+
+      if (target.frequency === "One-Time") {
+        itemUpdates.delete_after_reset = true;
       }
+    } else {
+      itemUpdates.is_active = true;
+      itemUpdates.delete_after_reset = false;
+    }
 
-      const updatedTotals = await updateSelectedTotalsRow({
-        points: Math.max(0, (selectedTotals.points || 0) + pointDelta),
-        hygiene_done: Math.max(0, (selectedTotals.hygiene_done || 0) + hygieneDelta),
-      });
+    const { error } = await supabase
+      .from(selectedConfig.table)
+      .update(itemUpdates)
+      .eq("id", itemId);
 
-      if (!updatedTotals) return;
-
-      const { data, error: refreshError } = await supabase
-        .from("hygiene")
-        .select("*")
-        .eq("profile_id", selectedProfile.id)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true });
-
-      if (!refreshError) {
-        setSelectedHygiene(data || []);
-      }
-
-      await insertActivityLog(
-        `${newDone ? `+${target.points} pts — Completed hygiene` : `-${target.points} pts — Unchecked hygiene`}: ${target.title}`
-      );
+    if (error) {
+      console.log(`Toggle ${selectedConfig.label} error:`, error.message);
       return;
     }
 
-    if (section === "tasks") {
-      const target = selectedTasks.find((item) => item.id === itemId);
-      if (!target) return;
+    const totalsUpdate = {
+      points: Math.max(0, (selectedTotals.points || 0) + pointDelta),
+    };
 
-      const newDone = !target.done;
-      const pointDelta = newDone ? target.points : -target.points;
-
-      const { error } = await supabase
-        .from("tasks")
-        .update({ done: newDone })
-        .eq("id", itemId);
-
-      if (error) {
-        console.log("Toggle task error:", error.message);
-        return;
-      }
-
-      const updatedTotals = await updateSelectedTotalsRow({
-        points: Math.max(0, (selectedTotals.points || 0) + pointDelta),
-      });
-
-      if (!updatedTotals) return;
-
-      const { data, error: refreshError } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("profile_id", selectedProfile.id)
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true });
-
-      if (!refreshError) {
-        setSelectedTasks(data || []);
-      }
-
-      await insertActivityLog(
-        `${newDone ? `+${target.points} pts — Completed task` : `-${target.points} pts — Unchecked task`}: ${target.title}`
+    if (selectedConfig.doneCountField) {
+      const countDelta = newDone ? 1 : -1;
+      totalsUpdate[selectedConfig.doneCountField] = Math.max(
+        0,
+        (selectedTotals[selectedConfig.doneCountField] || 0) + countDelta
       );
-      return;
     }
 
-    alert(`${section} is not migrated to the database yet.`);
+    const updatedTotals = await updateSelectedTotalsRow(totalsUpdate);
+    if (!updatedTotals) return;
+
+    const { data, error: refreshError } = await supabase
+      .from(selectedConfig.table)
+      .select("*")
+      .eq("profile_id", selectedProfile.id)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    if (!refreshError) {
+      selectedConfig.setItems(data || []);
+    }
+
+    await insertActivityLog(
+      `${newDone ? `+${target.points} pts — Completed ${selectedConfig.label}` : `-${target.points} pts — Unchecked ${selectedConfig.label}`}: ${target.title}`
+    );
   };
 
   const addItem = async (section, newItem) => {
@@ -1838,6 +1815,28 @@ function App() {
             >
               Dashboard
             </button>
+
+            <button
+              className={currentPage === "chores" ? "nav-btn active-nav" : "nav-btn"}
+              onClick={() => setCurrentPage("chores")}
+            >
+              Chores
+            </button>
+
+            <button
+              className={currentPage === "hygiene" ? "nav-btn active-nav" : "nav-btn"}
+              onClick={() => setCurrentPage("hygiene")}
+            >
+              Hygiene
+            </button>
+
+            <button
+              className={currentPage === "tasks" ? "nav-btn active-nav" : "nav-btn"}
+              onClick={() => setCurrentPage("tasks")}
+            >
+              Tasks
+            </button>
+
             <button
               className={currentPage === "rewards" ? "nav-btn active-nav" : "nav-btn"}
               onClick={() => setCurrentPage("rewards")}
@@ -1908,6 +1907,7 @@ function App() {
           <div className="left-column">
             <aside className="card sidebar">
               <h2>Kids</h2>
+
               {childProfiles.map((kid) => {
                 const kidTotals = allTotalsByProfileId[kid.id];
                 const points = Number(kidTotals?.points ?? 0);
@@ -1916,6 +1916,108 @@ function App() {
                   weeklyGoal > 0
                     ? Math.min(100, Math.round((points / weeklyGoal) * 100))
                     : 0;
+
+                return (
+                  <button
+                    key={kid.id}
+                    className={`kid-button ${selectedProfileId === kid.id ? "active" : ""}`}
+                    onClick={() => setSelectedProfileId(kid.id)}
+                  >
+                    <div className="kid-top">
+                      <span>{kid.name}</span>
+                      <span>{points} pts</span>
+                    </div>
+
+                    <small>Age {kid.age} • Weekly goal {weeklyGoal}</small>
+
+                    <div className="progress">
+                      <div className="progress-bar" style={{ width: `${pct}%` }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </aside>
+          </div>
+
+          <main className="content">
+            <section className="card">
+              <h2>{selectedKid.name}'s Overview</h2>
+              <p>Quick snapshot of progress and activity.</p>
+
+              <div className="summary-grid">
+                <div className="mini-card">
+                  <span>Points</span>
+                  <strong>{selectedKid.points}</strong>
+                </div>
+
+                <div className="mini-card">
+                  <span>Weekly Goal</span>
+                  <strong>{selectedKid.weeklyGoal}</strong>
+                </div>
+
+                <div className="mini-card">
+                  <span>Reading Today</span>
+                  <strong>{selectedKid.readingToday} min</strong>
+                </div>
+
+                <div className="mini-card">
+                  <span>Reading Bank</span>
+                  <strong>{selectedKid.readingBank} min</strong>
+                </div>
+
+                <div className="mini-card">
+                  <span>Screen Available</span>
+                  <strong>{selectedKid.availableScreenTime} min</strong>
+                </div>
+
+                <div className="mini-card">
+                  <span>Screen Used</span>
+                  <strong>{selectedKid.usedScreenTime} min</strong>
+                </div>
+              </div>
+            </section>
+
+            <section className="card">
+              <h2>Recent Activity</h2>
+
+              {getRecentActivity(selectedKid.activity, currentRole).length === 0 ? (
+                <p className="activity-empty">No recent activity.</p>
+              ) : (
+                <div className="activity-scroll">
+                  {getRecentActivity(selectedKid.activity, currentRole).map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={`activity-row compact ${index >= 5 ? "activity-extra" : ""}`}
+                    >
+                      <div>
+                        <strong>{item.text}</strong>
+                        <small>
+                          {item.by} •{" "}
+                          {item.timestamp ? formatDateTime(item.timestamp) : item.time}
+                        </small>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </main>
+        </div>
+      )}
+      {currentPage === "chores" && (
+        <div className="main-grid">
+          <div className="left-column">
+            <aside className="card sidebar">
+              <h2>Kids</h2>
+              {childProfiles.map((kid) => {
+                const kidTotals = allTotalsByProfileId[kid.id];
+                const points = Number(kidTotals?.points ?? 0);
+                const weeklyGoal = Number(kidTotals?.weekly_goal ?? 100);
+                const pct =
+                  weeklyGoal > 0
+                    ? Math.min(100, Math.round((points / weeklyGoal) * 100))
+                    : 0;
+
                 return (
                   <button
                     key={kid.id}
@@ -1937,93 +2039,34 @@ function App() {
 
             {canSeeParentControls && (
               <aside className="card parent-tile">
-                <h2>Parent Controls</h2>
-                <p className="admin-note">Owner/Parent only tools for {selectedKid.name}.</p>
+                <h2>Add Chore</h2>
+                <p className="admin-note">Add a chore for {selectedKid.name}.</p>
 
                 <div className="form-block">
-                  <h3>Add Chore</h3>
                   <input
                     placeholder="Chore name"
                     value={newChore.title}
                     onChange={(e) => setNewChore({ ...newChore, title: e.target.value })}
                   />
+
                   <input
                     type="number"
+                    placeholder="Points"
                     value={newChore.points}
                     onChange={(e) => setNewChore({ ...newChore, points: e.target.value })}
                   />
+
                   <select
                     value={newChore.frequency}
                     onChange={(e) => setNewChore({ ...newChore, frequency: e.target.value })}
                   >
                     <option>Daily</option>
                     <option>Weekly</option>
-                  </select>
-                  <button onClick={() => addItem("chores", newChore)}>Add Chore</button>
-                </div>
-
-                <div className="form-block">
-                  <h3>Add Hygiene</h3>
-                  <input
-                    placeholder="Hygiene task"
-                    value={newHygiene.title}
-                    onChange={(e) => setNewHygiene({ ...newHygiene, title: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    value={newHygiene.points}
-                    onChange={(e) => setNewHygiene({ ...newHygiene, points: e.target.value })}
-                  />
-                  <select
-                    value={newHygiene.frequency}
-                    onChange={(e) => setNewHygiene({ ...newHygiene, frequency: e.target.value })}
-                  >
-                    <option>Daily</option>
-                    <option>Morning</option>
-                    <option>Evening</option>
-                    <option>Weekly</option>
-                  </select>
-                  <button onClick={() => addItem("hygiene", newHygiene)}>Add Hygiene</button>
-                </div>
-
-                <div className="form-block">
-                  <h3>Add Task</h3>
-                  <input
-                    placeholder="Task name"
-                    value={newTaskItem.title}
-                    onChange={(e) => setNewTaskItem({ ...newTaskItem, title: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    value={newTaskItem.points}
-                    onChange={(e) => setNewTaskItem({ ...newTaskItem, points: e.target.value })}
-                  />
-                  <select
-                    value={newTaskItem.frequency}
-                    onChange={(e) => setNewTaskItem({ ...newTaskItem, frequency: e.target.value })}
-                  >
+                    <option>Monthly</option>
                     <option>One-Time</option>
-                    <option>Daily</option>
-                    <option>Weekly</option>
-                    <option>Repeatable</option>
                   </select>
-                  <button onClick={() => addItem("tasks", newTaskItem)}>Add Task</button>
-                </div>
 
-                <div className="form-block">
-                  <h3>Add Reward</h3>
-                  <input
-                    placeholder="Reward title"
-                    value={newReward.title}
-                    onChange={(e) => setNewReward({ ...newReward, title: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Point cost"
-                    value={newReward.cost}
-                    onChange={(e) => setNewReward({ ...newReward, cost: e.target.value })}
-                  />
-                  <button onClick={addReward}>Add Reward</button>
+                  <button onClick={() => addItem("chores", newChore)}>Add Chore</button>
                 </div>
               </aside>
             )}
@@ -2031,323 +2074,265 @@ function App() {
 
           <main className="content">
             <section className="card">
-              <h2>{selectedKid.name}</h2>
-              <p>Track progress, rewards, and screen-time requests.</p>
-              <div className="summary-grid">
-                <div className="mini-card system-card reading-card">
-                  <h3>Reading</h3>
-                  <div className="system-stats">
-                    <div className="system-stat">
-                      <span>Total</span>
-                      <strong>{selectedKid.readingMinutes} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Today</span>
-                      <strong>{selectedKid.readingToday} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Goal</span>
-                      <strong>{selectedKid.dailyReadingGoal} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Debt</span>
-                      <strong>{selectedKid.readingDebt} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Bank</span>
-                      <strong>{selectedKid.readingBank} min</strong>
-                    </div>
-                  </div>
-                </div>
+              <h2>{selectedKid.name}'s Chores</h2>
+              <p>Check off chores when they are completed.</p>
 
-                <div className="mini-card system-card screen-card">
-                  <h3>Screen Time</h3>
-                  <div className="system-stats">
-                    <div className="system-stat">
-                      <span>Pending</span>
-                      <strong>{selectedKid.screenTimePendingMinutes} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Pending Cost</span>
-                      <strong>{selectedKid.screenTimePendingCost} pts</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Available</span>
-                      <strong>{selectedKid.availableScreenTime} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Used</span>
-                      <strong>{selectedKid.usedScreenTime} min</strong>
-                    </div>
-                    <div className="system-stat">
-                      <span>Cost / 10</span>
-                      <strong>{selectedKid.screenTimeCostPer10} pts</strong>
-                    </div>
-                  </div>
-                </div>
+              {selectedKid.chores.filter((item) => canSeeParentControls || item.is_active !== false).length === 0 ? (
+                <p className="activity-empty">No chores added yet.</p>
+              ) : (
+                selectedKid.chores
+                  .filter((item) => canSeeParentControls || item.is_active !== false)
+                  .map((item) => (
+                    <div key={item.id} className="task-row">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => toggleItem(item.id, "chores")}
+                      />
 
-                <div className="mini-card">
-                  <span>Learning</span>
-                  <strong>{selectedKid.learningMinutes} min</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Chores</span>
-                  <strong>{selectedKid.choresDone}</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Hygiene</span>
-                  <strong>{selectedKid.hygieneDone}</strong>
-                </div>
-              </div>
-            </section>
-
-            <section className="two-col">
-              <div className="card">
-                <h2>Chores</h2>
-                {selectedKid.chores.map((item) => (
-                  <div key={item.id} className="task-row">
-                    <input
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => toggleItem(item.id, "chores")}
-                    />
-                    <div className="task-text">
-                      <span className={item.done ? "done" : ""}>{item.title}</span>
-                      <small>{item.frequency}</small>
-                    </div>
-                    <span>+{item.points}</span>
-                    {canDeleteItems && (
-                      <button
-                        type="button"
-                        onClick={() => deleteItem("chores", item.id)}
-                        className="delete-btn"
-                      >
-                        X
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-
-
-                <h2 style={{ marginTop: "24px" }}>Hygiene</h2>
-                {selectedKid.hygiene.map((item) => (
-                  <div key={item.id} className="task-row">
-                    <input
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => toggleItem(item.id, "hygiene")}
-                    />
-                    <div className="task-text">
-                      <span className={item.done ? "done" : ""}>{item.title}</span>
-                      <small>{item.frequency}</small>
-                    </div>
-                    <span>+{item.points}</span>
-                    {canDeleteItems && (
-                      <button
-                        type="button"
-                        onClick={() => deleteItem("hygiene", item.id)}
-                        className="delete-btn"
-                      >
-                        X
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-
-
-                <h2 style={{ marginTop: "24px" }}>Tasks</h2>
-                {selectedKid.tasks.map((item) => (
-                  <div key={item.id} className="task-row">
-                    <input
-                      type="checkbox"
-                      checked={item.done}
-                      onChange={() => toggleItem(item.id, "tasks")}
-                    />
-                    <div className="task-text">
-                      <span className={item.done ? "done" : ""}>{item.title}</span>
-                      <small>{item.frequency}</small>
-                    </div>
-                    <span>+{item.points}</span>
-                    {canDeleteItems && (
-                      <button
-                        type="button"
-                        onClick={() => deleteItem("tasks", item.id)}
-                        className="delete-btn"
-                      >
-                        X
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-
-
-              <div className="card">
-                <h2>Quick Actions</h2>
-                <div className="button-grid">
-                  <button onClick={() => addMinutes("reading", 10)}>
-                    I Read 10 Min
-                  </button>
-
-                  <button onClick={() => addMinutes("learning", 10)}>
-                    I Learned 10 Min
-                  </button>
-
-                  <button
-                    className="reward-request-btn"
-                    onClick={() => requestScreenTime(10)}
-                  >
-                    <span className="reward-ribbon">REWARD</span>
-                    <span className="reward-request-main">
-                      <strong>Request 10 Screen</strong>
-                      <small>{selectedKid.screenTimeCostPer10} pts</small>
-                    </span>
-                  </button>
-
-                  <button onClick={() => useScreenTime(10)}>
-                    I Used 10 Screen
-                  </button>
-                </div>
-
-                {canManageRewards && (
-                  <div className="form-block">
-                    <h3>Parent Screen Time Tools</h3>
-
-                    <div className="screen-tools-row">
-                      <button onClick={() => approveScreenTime(10)}>
-                        Approve 10 Screen
-                      </button>
-
-                      <div className="screen-cost-inline">
-                        <label>Cost per 10 min</label>
-
-                        <div className="screen-cost-controls">
-                          <input
-                            type="number"
-                            value={screenCostInput}
-                            onChange={(e) => setScreenCostInput(e.target.value)}
-                          />
-                          <button type="button" onClick={applyScreenCost}>
-                            Set Cost
-                          </button>
-                        </div>
-
-                        <small className="screen-cost-current">
-                          Current: {selectedKid.screenTimeCostPer10} pts
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {canSeeParentControls && (
-                  <div className="form-block">
-                    <h3>Reading Settings</h3>
-
-                    <div className="screen-cost-inline">
-                      <label>Daily Reading Goal (minutes)</label>
-
-                      <div className="screen-cost-controls">
-                        <input
-                          type="number"
-                          value={readingGoalInput}
-                          onChange={(e) => setReadingGoalInput(e.target.value)}
-                        />
-                        <button type="button" onClick={updateDailyReadingGoal}>
-                          Set Goal
-                        </button>
+                      <div className="task-text">
+                        <span className={item.done ? "done" : ""}>{item.title}</span>
+                        <small>{item.frequency}</small>
                       </div>
 
-                      <small className="screen-cost-current">
-                        Current: {selectedKid.dailyReadingGoal} min
-                      </small>
-                    </div>
-                    <div className="screen-cost-inline">
-                      <label>Reading Points Value (per 10 minutes)</label>
+                      <span>+{item.points}</span>
 
-                      <div className="screen-cost-controls">
-                        <input
-                          type="number"
-                          value={readingPointsInput}
-                          onChange={(e) => setReadingPointsInput(e.target.value)}
-                        />
-                        <button type="button" onClick={updateReadingPointsValue}>
-                          Set Points
-                        </button>
-                      </div>
-
-                      <small className="screen-cost-current">
-                        Current: {selectedKid.readingPointsPer10} pts per 10 min
-                      </small>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="two-col">
-              <div className="card">
-                <h2>Rewards</h2>
-                {selectedKid.rewards.map((reward) => {
-                  const canRedeem = selectedKid.points >= reward.cost && !reward.claimed;
-
-                  return (
-                    <div key={reward.id} className="reward-row">
-                      <div>
-                        <strong>{reward.title}</strong>
-                        <small>{reward.cost} points</small>
-                      </div>
-
-                      <div className="reward-actions">
+                      {canDeleteItems && (
                         <button
-                          disabled={!canRedeem}
-                          onClick={() => redeemReward(reward.id)}
+                          type="button"
+                          onClick={() => deleteItem("chores", item.id)}
+                          className="delete-btn"
                         >
-                          {reward.claimed ? "Claimed" : canRedeem ? "Redeem" : "Not enough"}
+                          X
                         </button>
-
-                        {canDeleteItems && (
-                          <button
-                            type="button"
-                            className="delete-btn small"
-                            onClick={() => deleteReward(reward.id)}
-                          >
-                            X
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="activity-scroll">
-                {getRecentActivity(selectedKid.activity, currentRole).length === 0 ? (
-                  <p className="activity-empty">No recent activity.</p>
-                ) : (
-                  getRecentActivity(selectedKid.activity, currentRole).map((item, index) => (
-                    <div
-                      key={item.id}
-                      className={`activity-row compact ${index >= 5 ? "activity-extra" : ""}`}
-                    >
-                      <div>
-                        <strong>{item.text}</strong>
-                        <small>
-                          {item.by} •{" "}
-                          {item.timestamp
-                            ? formatDateTime(item.timestamp)
-                            : item.time}
-                        </small>
-                      </div>
+                      )}
                     </div>
                   ))
-                )}
-              </div>
+              )}
+            </section>
+          </main>
+        </div>
+      )}
+      {currentPage === "hygiene" && (
+        <div className="main-grid">
+          <div className="left-column">
+            <aside className="card sidebar">
+              <h2>Kids</h2>
+              {childProfiles.map((kid) => {
+                const kidTotals = allTotalsByProfileId[kid.id];
+                const points = Number(kidTotals?.points ?? 0);
+                const weeklyGoal = Number(kidTotals?.weekly_goal ?? 100);
+                const pct =
+                  weeklyGoal > 0
+                    ? Math.min(100, Math.round((points / weeklyGoal) * 100))
+                    : 0;
+
+                return (
+                  <button
+                    key={kid.id}
+                    className={`kid-button ${selectedProfileId === kid.id ? "active" : ""}`}
+                    onClick={() => setSelectedProfileId(kid.id)}
+                  >
+                    <div className="kid-top">
+                      <span>{kid.name}</span>
+                      <span>{points} pts</span>
+                    </div>
+                    <small>Age {kid.age} • Weekly goal {weeklyGoal}</small>
+                    <div className="progress">
+                      <div className="progress-bar" style={{ width: `${pct}%` }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </aside>
+
+            {canSeeParentControls && (
+              <aside className="card parent-tile">
+                <h2>Add Hygiene</h2>
+                <p className="admin-note">Add hygiene item for {selectedKid.name}.</p>
+
+                <div className="form-block">
+                  <input
+                    placeholder="Hygiene name"
+                    value={newHygiene.title}
+                    onChange={(e) => setNewHygiene({ ...newHygiene, title: e.target.value })}
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Points"
+                    value={newHygiene.points}
+                    onChange={(e) => setNewHygiene({ ...newHygiene, points: e.target.value })}
+                  />
+
+                  <select
+                    value={newHygiene.frequency}
+                    onChange={(e) => setNewHygiene({ ...newHygiene, frequency: e.target.value })}
+                  >
+                    <option>Morning</option>
+                    <option>Evening</option>
+                    <option>Daily</option>
+                    <option>Weekly</option>
+                    <option>Monthly</option>
+                    <option>One-Time</option>
+                  </select>
+
+                  <button onClick={() => addItem("hygiene", newHygiene)}>
+                    Add Hygiene
+                  </button>
+                </div>
+              </aside>
+            )}
+          </div>
+
+          <main className="content">
+            <section className="card">
+              <h2>{selectedKid.name}'s Hygiene</h2>
+              <p>Track daily and weekly hygiene habits.</p>
+
+              {selectedKid.hygiene.filter((item) => canSeeParentControls || item.is_active !== false).length === 0 ? (
+                <p className="activity-empty">No hygiene items added yet.</p>
+              ) : (
+                selectedKid.hygiene
+                  .filter((item) => canSeeParentControls || item.is_active !== false)
+                  .map((item) => (
+                    <div key={item.id} className="task-row">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => toggleItem(item.id, "hygiene")}
+                      />
+
+                      <div className="task-text">
+                        <span className={item.done ? "done" : ""}>{item.title}</span>
+                        <small>{item.frequency}</small>
+                      </div>
+
+                      <span>+{item.points}</span>
+
+                      {canDeleteItems && (
+                        <button
+                          type="button"
+                          onClick={() => deleteItem("hygiene", item.id)}
+                          className="delete-btn"
+                        >
+                          X
+                        </button>
+                      )}
+                    </div>
+                  ))
+              )}
+            </section>
+          </main>
+        </div>
+      )}
+      {currentPage === "tasks" && (
+        <div className="main-grid">
+          <div className="left-column">
+            <aside className="card sidebar">
+              <h2>Kids</h2>
+              {childProfiles.map((kid) => {
+                const kidTotals = allTotalsByProfileId[kid.id];
+                const points = Number(kidTotals?.points ?? 0);
+                const weeklyGoal = Number(kidTotals?.weekly_goal ?? 100);
+                const pct =
+                  weeklyGoal > 0
+                    ? Math.min(100, Math.round((points / weeklyGoal) * 100))
+                    : 0;
+
+                return (
+                  <button
+                    key={kid.id}
+                    className={`kid-button ${selectedProfileId === kid.id ? "active" : ""}`}
+                    onClick={() => setSelectedProfileId(kid.id)}
+                  >
+                    <div className="kid-top">
+                      <span>{kid.name}</span>
+                      <span>{points} pts</span>
+                    </div>
+                    <small>Age {kid.age} • Weekly goal {weeklyGoal}</small>
+                    <div className="progress">
+                      <div className="progress-bar" style={{ width: `${pct}%` }} />
+                    </div>
+                  </button>
+                );
+              })}
+            </aside>
+
+            {canSeeParentControls && (
+              <aside className="card parent-tile">
+                <h2>Add Task</h2>
+                <p className="admin-note">Add a task for {selectedKid.name}.</p>
+
+                <div className="form-block">
+                  <input
+                    placeholder="Task name"
+                    value={newTaskItem.title}
+                    onChange={(e) => setNewTaskItem({ ...newTaskItem, title: e.target.value })}
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Points"
+                    value={newTaskItem.points}
+                    onChange={(e) => setNewTaskItem({ ...newTaskItem, points: e.target.value })}
+                  />
+
+                  <select
+                    value={newTaskItem.frequency}
+                    onChange={(e) => setNewTaskItem({ ...newTaskItem, frequency: e.target.value })}
+                  >
+                    <option>Daily</option>
+                    <option>Weekly</option>
+                    <option>Monthly</option>
+                    <option>One-Time</option>
+                  </select>
+
+                  <button onClick={() => addItem("tasks", newTaskItem)}>
+                    Add Task
+                  </button>
+                </div>
+              </aside>
+            )}
+          </div>
+
+          <main className="content">
+            <section className="card">
+              <h2>{selectedKid.name}'s Tasks</h2>
+              <p>Track daily, weekly, and monthly tasks.</p>
+
+              {selectedKid.tasks.filter((item) => canSeeParentControls || item.is_active !== false).length === 0 ? (
+                <p className="activity-empty">No tasks added yet.</p>
+              ) : (
+                selectedKid.tasks
+                  .filter((item) => canSeeParentControls || item.is_active !== false)
+                  .map((item) => (
+                    <div key={item.id} className="task-row">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => toggleItem(item.id, "tasks")}
+                      />
+
+                      <div className="task-text">
+                        <span className={item.done ? "done" : ""}>{item.title}</span>
+                        <small>{item.frequency}</small>
+                      </div>
+
+                      <span>+{item.points}</span>
+
+                      {canDeleteItems && (
+                        <button
+                          type="button"
+                          onClick={() => deleteItem("tasks", item.id)}
+                          className="delete-btn"
+                        >
+                          X
+                        </button>
+                      )}
+                    </div>
+                  ))
+              )}
             </section>
           </main>
         </div>
@@ -2371,6 +2356,31 @@ function App() {
                 </button>
               ))}
             </aside>
+
+            {canSeeParentControls && (
+              <aside className="card parent-tile">
+                <h2>Parental Controls</h2>
+
+                <div className="form-block">
+                  <h3>Add Reward</h3>
+
+                  <input
+                    placeholder="Reward title"
+                    value={newReward.title}
+                    onChange={(e) => setNewReward({ ...newReward, title: e.target.value })}
+                  />
+
+                  <input
+                    type="number"
+                    placeholder="Point cost"
+                    value={newReward.cost}
+                    onChange={(e) => setNewReward({ ...newReward, cost: e.target.value })}
+                  />
+
+                  <button onClick={addReward}>Add Reward</button>
+                </div>
+              </aside>
+            )}
 
             <aside className="card parent-tile">
               <h2>Request Reward</h2>
@@ -2411,9 +2421,7 @@ function App() {
                 }
               />
 
-              <button onClick={addRewardRequest}>
-                Submit Request
-              </button>
+              <button onClick={addRewardRequest}>Submit Request</button>
             </aside>
           </div>
 
@@ -2425,15 +2433,44 @@ function App() {
             <section className="two-col">
               <div className="card">
                 <h2>Active Rewards</h2>
-                {selectedKid.rewards.map((reward) => (
-                  <div key={reward.id} className="reward-row">
-                    <div>
-                      <strong>{reward.title}</strong>
-                      <small>{reward.cost} pts</small>
-                    </div>
-                    <span>{reward.claimed ? "Claimed" : "Available"}</span>
-                  </div>
-                ))}
+
+                {selectedKid.rewards.filter((r) => r.status === "available").length === 0 ? (
+                  <p className="activity-empty">No active rewards yet.</p>
+                ) : (
+                  selectedKid.rewards
+                    .filter((r) => r.status === "available")
+                    .map((reward) => {
+                      const canRedeem = selectedKid.points >= reward.cost && !reward.claimed;
+
+                      return (
+                        <div key={reward.id} className="reward-row">
+                          <div>
+                            <strong>{reward.title}</strong>
+                            <small>{reward.cost} points</small>
+                          </div>
+
+                          <div className="reward-actions">
+                            <button
+                              disabled={!canRedeem}
+                              onClick={() => redeemReward(reward.id)}
+                            >
+                              {reward.claimed ? "Claimed" : canRedeem ? "Redeem" : "Not enough"}
+                            </button>
+
+                            {canDeleteItems && (
+                              <button
+                                type="button"
+                                className="delete-btn small"
+                                onClick={() => deleteReward(reward.id)}
+                              >
+                                X
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                )}
               </div>
 
               <div className="card">
@@ -2502,7 +2539,6 @@ function App() {
                             </div>
                           ) : null}
 
-                          {/* PARENT ACTIONS */}
                           {canManageRewards && isPending && (
                             <div className="request-actions">
                               <div className="request-edit-block">
@@ -2534,7 +2570,6 @@ function App() {
                             </div>
                           )}
 
-                          {/* CHILD ACKNOWLEDGE */}
                           {!canManageRewards && isResolved && (
                             <div className="request-actions">
                               <div className="request-action-buttons">
