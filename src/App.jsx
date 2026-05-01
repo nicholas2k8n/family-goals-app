@@ -1945,37 +1945,6 @@ function App() {
               <p>Quick snapshot of progress and activity.</p>
 
               <div className="summary-grid">
-                <div className="mini-card">
-                  <span>Points</span>
-                  <strong>{selectedKid.points}</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Weekly Goal</span>
-                  <strong>{selectedKid.weeklyGoal}</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Reading Today</span>
-                  <strong>{selectedKid.readingToday} min</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Reading Bank</span>
-                  <strong>{selectedKid.readingBank} min</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Screen Available</span>
-                  <strong>{selectedKid.availableScreenTime} min</strong>
-                </div>
-
-                <div className="mini-card">
-                  <span>Screen Used</span>
-                  <strong>{selectedKid.usedScreenTime} min</strong>
-                </div>
-              </div>
-              <div className="summary-grid">
                 <div className="card system-card reading-card">
                   <h3>Reading</h3>
 
