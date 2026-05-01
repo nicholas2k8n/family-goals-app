@@ -1069,3 +1069,127 @@ label {
     min-height: 64px;
   }
 }
+
+.dashboard-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.dashboard-actions .card {
+  flex: 1;
+  min-width: 250px;
+}
+
+.pill-action-group {
+  display: inline-flex;
+  width: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-soft);
+}
+
+.pill-action-group button {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  padding: 12px 10px;
+  font-weight: 800;
+  color: white;
+  -webkit-text-fill-color: white;
+}
+
+.pill-action-group button+button {
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.reading-actions button:nth-child(1) {
+  background: #2563eb;
+}
+
+.reading-actions button:nth-child(2) {
+  background: #1d4ed8;
+}
+
+.reading-actions button:nth-child(3) {
+  background: #1e40af;
+}
+
+.request-actions-clean button:nth-child(1) {
+  background: #16a34a;
+}
+
+.request-actions-clean button:nth-child(2) {
+  background: #15803d;
+}
+
+.use-actions-clean button:nth-child(1) {
+  background: #7c3aed;
+}
+
+.use-actions-clean button:nth-child(2) {
+  background: #6d28d9;
+}
+
+.approve-actions-clean button:nth-child(1) {
+  background: #ea580c;
+}
+
+.approve-actions-clean button:nth-child(2) {
+  background: #c2410c;
+}
+
+.screen-action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.screen-cost-controls {
+  justify-content: center;
+}
+
+.screen-cost-inline {
+  align-items: center;
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .reading-actions button:nth-child(1) {
+    background: #1d4ed8;
+  }
+
+  .reading-actions button:nth-child(2) {
+    background: #1e40af;
+  }
+
+  .reading-actions button:nth-child(3) {
+    background: #1e3a8a;
+  }
+
+  .request-actions-clean button:nth-child(1) {
+    background: #15803d;
+  }
+
+  .request-actions-clean button:nth-child(2) {
+    background: #166534;
+  }
+
+  .use-actions-clean button:nth-child(1) {
+    background: #6d28d9;
+  }
+
+  .use-actions-clean button:nth-child(2) {
+    background: #5b21b6;
+  }
+
+  .approve-actions-clean button:nth-child(1) {
+    background: #c2410c;
+  }
+
+  .approve-actions-clean button:nth-child(2) {
+    background: #9a3412;
+  }
+}

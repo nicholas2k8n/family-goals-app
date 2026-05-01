@@ -1975,6 +1975,136 @@ function App() {
                   <strong>{selectedKid.usedScreenTime} min</strong>
                 </div>
               </div>
+              <div className="summary-grid">
+                <div className="card system-card reading-card">
+                  <h3>Reading</h3>
+
+                  <div className="system-stats">
+                    <div className="system-stat">
+                      <span>Today</span>
+                      <strong>{selectedKid.readingToday} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Daily Goal</span>
+                      <strong>{selectedKid.dailyReadingGoal} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Debt</span>
+                      <strong>{selectedKid.readingDebt} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Bank</span>
+                      <strong>{selectedKid.readingBank} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Points / 10</span>
+                      <strong>{selectedKid.readingPointsPer10}</strong>
+                    </div>
+                  </div>
+
+                  <div className="pill-action-group reading-actions">
+                    <button onClick={() => addMinutes("reading", 10)}>+10</button>
+                    <button onClick={() => addMinutes("reading", 20)}>+20</button>
+                    <button onClick={() => addMinutes("reading", 30)}>+30</button>
+                  </div>
+
+                  {canSeeParentControls && (
+                    <div className="screen-tools-row">
+                      <div className="screen-cost-inline">
+                        <label>Daily Reading Goal</label>
+                        <div className="screen-cost-controls">
+                          <input
+                            type="number"
+                            value={readingGoalInput}
+                            onChange={(e) => setReadingGoalInput(e.target.value)}
+                          />
+                          <button onClick={updateDailyReadingGoal}>Set</button>
+                        </div>
+                      </div>
+
+                      <div className="screen-cost-inline">
+                        <label>Reading Points Per 10</label>
+                        <div className="screen-cost-controls">
+                          <input
+                            type="number"
+                            value={readingPointsInput}
+                            onChange={(e) => setReadingPointsInput(e.target.value)}
+                          />
+                          <button onClick={updateReadingPointsValue}>Set</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="card system-card screen-card">
+                  <h3>Screen Time</h3>
+
+                  <div className="system-stats">
+                    <div className="system-stat">
+                      <span>Available</span>
+                      <strong>{selectedKid.availableScreenTime} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Used</span>
+                      <strong>{selectedKid.usedScreenTime} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Pending</span>
+                      <strong>{selectedKid.screenTimePendingMinutes} min</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Pending Cost</span>
+                      <strong>{selectedKid.screenTimePendingCost} pts</strong>
+                    </div>
+
+                    <div className="system-stat">
+                      <span>Cost / 10</span>
+                      <strong>{selectedKid.screenTimeCostPer10} pts</strong>
+                    </div>
+                  </div>
+
+                  <div className="screen-action-stack">
+                    <div className="pill-action-group request-actions-clean">
+                      <button onClick={() => requestScreenTime(10)}>Request 10</button>
+                      <button onClick={() => requestScreenTime(20)}>Request 20</button>
+                    </div>
+
+                    <div className="pill-action-group use-actions-clean">
+                      <button onClick={() => useScreenTime(10)}>Use 10</button>
+                      <button onClick={() => useScreenTime(20)}>Use 20</button>
+                    </div>
+                  </div>
+
+                  {canSeeParentControls && (
+                    <div className="screen-tools-row">
+                      <div className="pill-action-group approve-actions-clean">
+                        <button onClick={() => approveScreenTime(10)}>Approve 10</button>
+                        <button onClick={() => approveScreenTime(20)}>Approve 20</button>
+                      </div>
+
+                      <div className="screen-cost-inline">
+                        <label>Screen Cost Per 10</label>
+                        <div className="screen-cost-controls">
+                          <input
+                            type="number"
+                            value={screenCostInput}
+                            onChange={(e) => setScreenCostInput(e.target.value)}
+                          />
+                          <button onClick={applyScreenCost}>Set</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </section>
 
             <section className="card">
