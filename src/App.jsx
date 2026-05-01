@@ -69,6 +69,11 @@ function App() {
   const [readingGoalInput, setReadingGoalInput] = useState("0");
   const [readingPointsInput, setReadingPointsInput] = useState("2");
   const [now, setNow] = useState(new Date());
+  const [dailyMessage, setDailyMessage] = useState({
+    label: "Today’s Boost",
+    text: "Loading something fun...",
+    emoji: "✨",
+  });
   const selectedProfile = useMemo(() => {
     if (isChild) {
       return childProfiles.find((p) => p.id === dbProfile?.id) || null;
@@ -76,6 +81,35 @@ function App() {
 
     return childProfiles.find((p) => p.id === selectedProfileId) || null;
   }, [childProfiles, selectedProfileId, isChild, dbProfile]);
+
+  useEffect(() => {
+    // Run immediately on load
+    fetchDailyMessage();
+
+    // Calculate time until next top of hour
+    const now = new Date();
+    const msUntilNextHour =
+      (60 - now.getMinutes()) * 60 * 1000 -
+      now.getSeconds() * 1000 -
+      now.getMilliseconds();
+
+    // Wait until next hour, then run every hour
+    const timeout = setTimeout(() => {
+      fetchDailyMessage();
+
+      const interval = setInterval(fetchDailyMessage, 60 * 60 * 1000);
+
+      // store interval on window so we can clear if needed
+      window.__dailyMessageInterval = interval;
+    }, msUntilNextHour);
+
+    return () => {
+      clearTimeout(timeout);
+      if (window.__dailyMessageInterval) {
+        clearInterval(window.__dailyMessageInterval);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!dbProfile) return;
@@ -377,7 +411,9 @@ function App() {
 
   useEffect(() => {
     const loadSelectedTasks = async () => {
-      if (!selectedProfile?.id) {
+      const householdId = selectedProfile?.household_id || dbProfile?.household_id;
+
+      if (!householdId) {
         setSelectedTasks([]);
         return;
       }
@@ -385,7 +421,7 @@ function App() {
       const { data, error } = await supabase
         .from("tasks")
         .select("*")
-        .eq("profile_id", selectedProfile.id)
+        .eq("household_id", householdId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -399,7 +435,7 @@ function App() {
     };
 
     loadSelectedTasks();
-  }, [selectedProfile, selectedTotals]);
+  }, [selectedProfile, dbProfile, selectedTotals]);
 
   useEffect(() => {
     const loadSelectedRewards = async () => {
@@ -538,6 +574,7 @@ function App() {
       })),
       tasks: selectedTasks.map((item) => ({
         id: item.id,
+        household_id: item.household_id,
         title: item.title,
         points: item.points,
         done: item.done,
@@ -545,6 +582,8 @@ function App() {
         is_active: item.is_active,
         completed_at: item.completed_at,
         delete_after_reset: item.delete_after_reset,
+        completed_by_profile_id: item.completed_by_profile_id,
+        completed_by_name: item.completed_by_name,
       })),
       rewards: selectedRewards.map((item) => ({
         id: item.id,
@@ -710,7 +749,7 @@ function App() {
         table: "tasks",
         doneCountField: null,
         setItems: setSelectedTasks,
-        label: "task",
+        label: "household task",
       },
     };
 
@@ -731,6 +770,11 @@ function App() {
       done: newDone,
       completed_at: newDone ? new Date().toISOString() : null,
     };
+
+    if (section === "tasks") {
+      itemUpdates.completed_by_profile_id = newDone ? selectedProfile.id : null;
+      itemUpdates.completed_by_name = newDone ? selectedProfile.name : null;
+    }
 
     if (newDone) {
       itemUpdates.is_active = false;
@@ -768,12 +812,22 @@ function App() {
     const updatedTotals = await updateSelectedTotalsRow(totalsUpdate);
     if (!updatedTotals) return;
 
-    const { data, error: refreshError } = await supabase
+    let refreshQuery = supabase
       .from(selectedConfig.table)
       .select("*")
-      .eq("profile_id", selectedProfile.id)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
+
+    if (section === "tasks") {
+      refreshQuery = refreshQuery.eq(
+        "household_id",
+        selectedProfile.household_id || dbProfile.household_id
+      );
+    } else {
+      refreshQuery = refreshQuery.eq("profile_id", selectedProfile.id);
+    }
+
+    const { data, error: refreshError } = await refreshQuery;
 
     if (!refreshError) {
       selectedConfig.setItems(data || []);
@@ -864,16 +918,29 @@ function App() {
     }
 
     if (section === "tasks") {
+      const householdId = selectedProfile?.household_id || dbProfile?.household_id;
+
+      if (!householdId) {
+        console.log("Add task error: no household id found.");
+        return;
+      }
+
       const nextSortOrder =
         selectedTasks.length > 0
           ? Math.max(...selectedTasks.map((item) => item.sort_order || 0)) + 1
           : 1;
 
       const { error } = await supabase.from("tasks").insert({
-        profile_id: selectedProfile.id,
+        household_id: householdId,
+        profile_id: null,
         title: newItem.title.trim(),
         points: Number(newItem.points) || 0,
         done: false,
+        is_active: true,
+        delete_after_reset: false,
+        completed_at: null,
+        completed_by_profile_id: null,
+        completed_by_name: null,
         frequency: newItem.frequency || "One-Time",
         sort_order: nextSortOrder,
         created_by_profile_id: dbProfile.id,
@@ -888,7 +955,7 @@ function App() {
       const { data, error: refreshError } = await supabase
         .from("tasks")
         .select("*")
-        .eq("profile_id", selectedProfile.id)
+        .eq("household_id", householdId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -896,7 +963,7 @@ function App() {
         setSelectedTasks(data || []);
       }
 
-      await insertActivityLog(`Added task: ${newItem.title}`);
+      await insertActivityLog(`Added household task: ${newItem.title}`);
       setNewTaskItem({ title: "", points: 5, frequency: "One-Time" });
       return;
     }
@@ -969,6 +1036,8 @@ function App() {
       const target = selectedTasks.find((item) => item.id === itemId);
       if (!target) return;
 
+      const householdId = target.household_id || selectedProfile?.household_id || dbProfile?.household_id;
+
       const { error } = await supabase
         .from("tasks")
         .delete()
@@ -982,7 +1051,7 @@ function App() {
       const { data, error: refreshError } = await supabase
         .from("tasks")
         .select("*")
-        .eq("profile_id", selectedProfile.id)
+        .eq("household_id", householdId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -990,7 +1059,7 @@ function App() {
         setSelectedTasks(data || []);
       }
 
-      await insertActivityLog(`Deleted task: ${target.title}`);
+      await insertActivityLog(`Deleted household task: ${target.title}`);
       return;
     }
 
@@ -1731,6 +1800,65 @@ function App() {
     });
   };
 
+  const cleanExternalMessage = (value) => {
+    if (typeof value !== "string") return "Stay focused and do your best today.";
+
+    return value
+      .replace(/[<>]/g, "")
+      .replace(/javascript:/gi, "")
+      .trim()
+      .slice(0, 240);
+  };
+
+  const fetchDailyMessage = async () => {
+    try {
+      const type = Math.floor(Math.random() * 3);
+
+      if (type === 0) {
+        const res = await fetch("https://icanhazdadjoke.com/", {
+          headers: { Accept: "application/json" },
+        });
+        const data = await res.json();
+
+        setDailyMessage({
+          label: "Dad Joke of the Day",
+          text: cleanExternalMessage(data.joke),
+          emoji: "😂",
+        });
+        return;
+      }
+
+      if (type === 1) {
+        const res = await fetch("https://api.quotable.io/random");
+        const data = await res.json();
+
+        setDailyMessage({
+          label: "Motivation Boost",
+          text: cleanExternalMessage(`${data.content} — ${data.author}`),
+          emoji: "💪",
+        });
+        return;
+      }
+
+      const res = await fetch("https://uselessfacts.jsph.pl/random.json?language=en");
+      const data = await res.json();
+
+      setDailyMessage({
+        label: "Fun Fact",
+        text: cleanExternalMessage(data.text),
+        emoji: "🤯",
+      });
+    } catch (err) {
+      console.log("Daily message error:", err);
+
+      setDailyMessage({
+        label: "Today’s Boost",
+        text: "Small steps still move you forward.",
+        emoji: "✨",
+      });
+    }
+  };
+
   if (isResetPasswordPage) {
     return (
       <div className="app">
@@ -1859,10 +1987,22 @@ function App() {
             )}
           </div>
 
-          <p>
-            Shared progress tracking for both homes: chores, reading, learning,
-            rewards, and screen-time requests.
-          </p>
+          <div className="daily-banner">
+            <div className="daily-banner-icon">{dailyMessage.emoji}</div>
+
+            <div className="daily-banner-text">
+              <strong>{dailyMessage.label}</strong>
+              <span>{dailyMessage.text}</span>
+            </div>
+
+            <button
+              type="button"
+              className="daily-banner-refresh"
+              onClick={fetchDailyMessage}
+            >
+              New
+            </button>
+          </div>
           <div className="live-datetime">
             {now.toLocaleString([], {
               weekday: "short",
@@ -2361,7 +2501,9 @@ function App() {
             {canSeeParentControls && (
               <aside className="card parent-tile">
                 <h2>Add Task</h2>
-                <p className="admin-note">Add a task for {selectedKid.name}.</p>
+                <p className="admin-note">
+                  Add a shared household task. It will be visible to every child in this household.
+                </p>
 
                 <div className="form-block">
                   <input
@@ -2397,8 +2539,12 @@ function App() {
 
           <main className="content">
             <section className="card">
-              <h2>{selectedKid.name}'s Tasks</h2>
-              <p>Track daily, weekly, and monthly tasks.</p>
+              <h2>Household Tasks</h2>
+              <p>
+                Household tasks are shared by everyone in this home. These are bigger jobs
+                that are not assigned to one child. Whoever completes the task first earns
+                the points. Daily, weekly, monthly, and one-time reset rules still apply.
+              </p>
 
               {selectedKid.tasks.filter((item) => canSeeParentControls || item.is_active !== false).length === 0 ? (
                 <p className="activity-empty">No tasks added yet.</p>
